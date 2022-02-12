@@ -6,7 +6,7 @@ import {
   useEntry,
   usePageState
 } from './PageState';
-import UserLoadedPageState from './ps/UserLoadedPageState';
+import UserLoadedFragment from './fragment/UserLoadedFragment';
 
 const callUserApi = () =>
   new Promise<UserData>((resolve) =>
@@ -45,29 +45,58 @@ function App() {
     pageState
   );
 
+  useEntry(
+    UserLoaded,
+    () => makeTransition(PostsNotLoaded, PostsLoading),
+    pageState
+  );
+
+  useEntry(
+    PostsLoading,
+    async () => {
+      const { userId } = pageState.getContext();
+      const r = await callPostsApi(userId);
+      makeTransition(PostsLoading, PostsLoaded, r);
+    },
+    pageState
+  );
+
   return (
     <div>
       <PageStateSwitch pageState={pageState}>
-        <div>something here</div>
-        <UserNotLoaded>
-          <div>user has not yet loaded</div>
-        </UserNotLoaded>
-        <UserLoading>
-          <div>user is loading...</div>
-        </UserLoading>
-        <UserLoaded>
-          {({ userId }: UserData) => <UserLoadedPageState userId={userId} />}
-          <div>here?</div>
-        </UserLoaded>
-        <PostsNotLoaded>
-          <div>posts have not yet loaded</div>
-        </PostsNotLoaded>
-        <PostsLoading>
-          <div>posts are now loading...</div>
-        </PostsLoading>
-        <PostsLoaded>
-          <div>posts are loaded!</div>
-        </PostsLoaded>
+        <div style={{ height: '30px', backgroundColor: '#e0e0e0' }}>
+          Some irrelevant info here
+        </div>
+
+        <div style={{ height: '80px' }}>
+          <UserNotLoaded>
+            <div>User data is not yet loaded.</div>
+          </UserNotLoaded>
+          <UserLoading>
+            <div>Loading user data...</div>
+          </UserLoading>
+          <UserLoaded>
+            {({ userId }: UserData) => <UserLoadedFragment userId={userId} />}
+            <div>User data is loaded!</div>
+          </UserLoaded>
+        </div>
+
+        <div style={{ marginTop: '20px', backgroundColor: '#e0e0e0' }}>
+          <PostsNotLoaded>
+            <div>Posts are not yet loaded.</div>
+          </PostsNotLoaded>
+          <PostsLoading>
+            <UserLoaded>
+              {({ userId }: UserData) => {
+                console.log('userId', userId);
+                return <div>Loading {userId}'s posts...</div>;
+              }}
+            </UserLoaded>
+          </PostsLoading>
+          <PostsLoaded>
+            <div>Posts are loaded!</div>
+          </PostsLoaded>
+        </div>
       </PageStateSwitch>
     </div>
   );

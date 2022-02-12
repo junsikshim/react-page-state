@@ -4,7 +4,7 @@ interface Props {
   userId: string;
 }
 
-const UserLoadedPageState = (props: Props) => {
+const UserLoadedFragment = (props: Props) => {
   const userId = props.userId;
 
   return (
@@ -14,4 +14,4 @@ const UserLoadedPageState = (props: Props) => {
   );
 };
 
-export default UserLoadedPageState;
+export default UserLoadedFragment;

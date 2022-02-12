@@ -3,7 +3,9 @@ import React, {
   cloneElement,
   FC,
   isValidElement,
+  JSXElementConstructor,
   PropsWithChildren,
+  ReactElement,
   ReactNode,
   useEffect,
   useState
@@ -47,7 +49,7 @@ export const createPageState = <T extends PageStateContext>(
           ? [children(props)]
           : Array.isArray(children)
           ? children
-          : [];
+          : [children];
 
       const r = list.map((c: ReactNode, i: number) => {
         if (isValidElement(c)) {
@@ -58,7 +60,7 @@ export const createPageState = <T extends PageStateContext>(
           });
         } else if (typeof c === 'function') {
           return cloneElement(c(props), {
-            ...rest,
+            ...props,
             key: i
           });
         }
@@ -95,12 +97,16 @@ export const usePageState = (initialPageState: PageState<PageStateContext>) => {
     <T extends PageStateContext>(
       from: PageState<PageStateContext>,
       to: PageState<T>,
-      context = {} as T
+      context = pageState.getContext() as T
     ) => {
-      const exitName = from.getName();
-      console.log(`Exiting ${exitName}.`);
-
       const map = pageState.getMap();
+      const exitName = from.getName();
+
+      if (!map.has(exitName)) {
+        return;
+      }
+
+      console.log(`Exiting ${exitName}.`);
       map.delete(exitName);
 
       const enterName = to.getName();
@@ -148,27 +154,70 @@ export const combinePageStates = (
   return ps;
 };
 
+const recursiveMap = (
+  pageState: PageState<PageStateContext>,
+  children: ReactNode,
+  f: (c: ReactNode) => ReactNode
+): ReactNode => {
+  const list = Array.isArray(children) ? children : [children];
+
+  return list.map((c: ReactNode, i: number) => {
+    if (isValidElement(c)) {
+      if (typeof c.type === 'function') {
+        // react element
+        const ps = c.type as PageState<PageStateContext>;
+        const name = ps.getName();
+
+        if (pageState.getMap().has(name) && c.props.children) {
+          const childList = Array.isArray(c.props.children)
+            ? c.props.children
+            : [c.props.children];
+
+          return cloneElement(c, {
+            ...c.props,
+            key: i,
+            children: recursiveMap(pageState, childList, f)
+          });
+        }
+
+        return null;
+      } else {
+        // html element
+        if (c.props.children) {
+          const childList = Array.isArray(c.props.children)
+            ? c.props.children
+            : [c.props.children];
+
+          return cloneElement(c, {
+            ...c.props,
+            key: i,
+            children: recursiveMap(pageState, childList, f)
+          });
+        } else {
+          return f(c);
+        }
+      }
+    } else {
+      // a text node or a function
+      return f(c);
+    }
+  });
+};
+
 export const PageStateSwitch = ({
   pageState,
   children
 }: PageStateSwitchProps) => {
   if (!children) return null;
 
-  const r = Children.map(children, (c: ReactNode) => {
-    if (isValidElement(c)) {
-      if (typeof c.type === 'function') {
-        const ps = c.type as PageState<PageStateContext>;
-        const name = ps.getName();
+  const r = recursiveMap(pageState, children, (c: ReactNode) => {
+    if (typeof c === 'function') {
+      const node = c(pageState.getContext());
 
-        if (pageState.getMap().has(name)) {
-          return cloneElement(c, pageState.getContext());
-        }
-      } else {
-        return c;
-      }
+      return node;
+    } else {
+      return c;
     }
-
-    return null;
   });
 
   return <>{r}</>;
